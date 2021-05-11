@@ -1,0 +1,155 @@
+<!doctype html><html><head><meta charset="utf-8" />
+<meta name=viewport content="width=device-width, initial-scale=1">
+
+<link rel="stylesheet" href="../lbasic.css" />
+
+<title>Emacs Lisp: Symbol vs String</title>
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-10884311-3"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-10884311-3');
+</script>
+
+</head>
+<body>
+
+<nav class="nav_back_y94tk"><a href="../index.html">Xah Emacs</a></nav>
+
+
+
+<main>
+
+<div class="ad_top_39054">
+</div>
+
+<h1>Emacs Lisp: Symbol vs String</h1>
+
+<div class="byline">By Xah Lee. Date: <time>2017-01-11</time>. Last updated: <time>2020-09-19</time>.</div>
+
+<p>
+In lisp, do not use symbol when you can use string, because it pollutes symbol table.
+</p>
+
+<p>Which of the following should you use?</p>
+
+<pre class="emacs-lisp">(<span class="xah-elisp-command">search-forward</span> <span class="string">"cat"</span> <span class="builtin">nil</span> <span class="string">"NOERROR"</span> )
+
+(<span class="xah-elisp-command">search-forward</span> <span class="string">"cat"</span> <span class="builtin">nil</span> '<span class="xah-elisp-cap-variable">NOERROR</span> )</pre>
+
+<p>Using symbol is problematic. It adds the symbol to the symbol lookup table
+<var class="elisp">obarray</var>
+, and may already have a value, possibly of <var class="elisp">nil</var>.</p>
+
+<figure>
+<img src="../emacs/i/emacs_symbols_obarray_list_2017-01-06.png" alt="emacs symbols obarray list 2017 01 06" width="770" height="788" />
+<figcaption>
+emacs run as --batch, not loading anything, there are 15305 symbols in obarray. normally, it's 45k to 80k symbols or more, depending on the number of packages loaded.
+</figcaption>
+</figure>
+
+<p>Here's explanation.</p>
+
+<p>In elisp:</p>
+
+<ul>
+<li>There's no named parameters. It's just ordered parameters.</li>
+<li>Also, there's no default argument mechanism.</li>
+<li>When a parameter doesn't receive argument, its value is nil.</li>
+<li>There's no way to tell if a parameter isn't passed a argument or if it was passed nil.</li>
+</ul>
+
+<p>[see <a href="../emacs/elisp_optional_params.html">Emacs Lisp: Function Optional Parameters</a>]</p>
+
+<p>So, this create a situation. When the parameters are meant to be true or false, you have code like this:
+<code>(f t nil t t nil nil)</code>, which is hard to understand.</p>
+
+<p>For example, the <code class="elisp_f_3d841">search-forward</code> function:</p>
+
+<p><code>(search-forward STRING &amp;optional BOUND NOERROR COUNT)</code></p>
+
+<p>and you may call it like this:</p>
+
+<pre class="emacs-lisp">(<span class="xah-elisp-command">search-forward</span> <span class="string">"cat"</span> <span class="builtin">nil</span> <span class="builtin">t</span> )</pre>
+
+<p>which means, search for “cat”, to the end of buffer (not bounded), and do not report error if not found (and move cursor to the found text or end of search limit (e.g. end of buffer) if none found.).</p>
+
+<p>One way to make it more readable is to replace some <var class="elisp">t</var> value by a string, since string in elisp is also non-nil. (Warning: some function's parameter differentiate <var class="elisp">t</var> and other non-<var class="elisp">nil</var> values, so you can't always just pass it a string without consideration.
+For example, <code class="elisp_f_3d841">search-forward</code>'s 3rd parameter and
+<code class="elisp_f_3d841">replace-match</code>'s 4th parameter.
+ )</p>
+
+<p>You can make a non-nil value more readable by passing a string instead, like this:</p>
+
+<pre class="emacs-lisp">(<span class="xah-elisp-command">search-forward</span> <span class="string">"cat"</span> <span class="builtin">nil</span> <span class="string">"NOERROR"</span> )</pre>
+
+<p>A couple years ago (~2015) a elisp hacker suggested to me to replace string
+<code>"NOERROR"</code>
+by a symbol
+<code>'NOERROR</code>. The reason given was that it costs more to create a string than symbol.</p>
+
+<p>I didn't really agree, because:</p>
+
+<ul>
+<li>If the cost of creating string is costy to the degree that programers have to think about, then the language would be a very impractical one. Doesn't matter how emacs implement string, this shouldn't matter, because strings are used in just about every function, including the doc string.</li>
+<li>Using symbol as non-nil is not intuitive. Because symbol is not in other languages, less well-understood to programers.</li>
+</ul>
+
+<p>However, i sometimes went along, just to experiment. So, in some parts of my code, you'll see <code>'NOERROR</code>
+and in other parts you see <code>"NOERROR"</code>.</p>
+
+<p>Today, i'm changing all of them back to the string form <code>"NOERROR"</code>.</p>
+
+<ul>
+<li>Because, using symbol pollutes the symbol table. That it, it creates the symbol and insert into <var class="elisp">obarray</var>. <span class="ref"><a href="../emacs_manual/elisp/Creating-Symbols.html">(info "(elisp) Creating Symbols")</a></span></li>
+<li>The symbol may already have a value, possibly <var class="elisp">nil</var>. This would cause incorrect program.</li>
+</ul>
+
+<p>Here's the functions that changed.</p>
+
+<ul>
+<li><a href="../emacs/emacs_quote_lines.html">Emacs: Quote Lines</a></li>
+<li><a href="../emacs/elisp_title_case_text.html">Emacs: Change to Title Case</a></li>
+<li><a href="../emacs/elisp_escape_quotes.html">Emacs: Escape Quotes Command</a></li>
+<li><a href="../emacs/emacs_delete_block.html">Emacs: Delete Text Block</a></li>
+<li><a href="../emacs/elisp_change_space-hyphen_underscore.html">Emacs: Cycle Space Hyphen Underscore</a></li>
+<li><a href="../emacs/emacs_reformat_lines.html">Emacs: Reformat Lines for Source Code</a></li>
+<li><a href="../emacs/elisp_change_brackets.html">Emacs: Change Brackets/Quotes</a></li>
+<li><a href="../emacs/elisp_image_tag.html">Emacs Lisp: HTML image-link Command</a></li>
+</ul>
+
+<div class="topic_xl">
+<h4>Misc Technical Essays on Emacs Lisp</h4>
+<ul>
+<li><a href="../misc/elisp_naming_convention.html">Emacs Lisp Naming Convention</a></li>
+<li><a href="../misc/emacs_lisp_some_and_every.html">Elisp: Some and Every</a></li>
+<li><a href="../misc/emacs_lisp_what_is_fn.html">Elisp: What is the Function fn?</a></li>
+<li><a href="../misc/elisp_symbol_vs_string_for_non_nil.html">Emacs Lisp: Symbol vs String</a></li>
+<li><a href="../misc/elisp_list_function_type_syntax_coloring.html">Meaning of Lisp List, Function Type, and Syntax Coloring</a></li>
+<li><a href="../emacs/elisp_vs_perl_validate_links.html">Elisp vs Perl: Validate File Links</a></li>
+<li><a href="../emacs/elisp_text_processing_lang.html">Text Processing: Emacs Lisp vs Perl</a></li>
+<li><a href="../emacs/elisp_namespace_solution_copying_javascript_practice.html">Can Emacs Lisp Fix Its Namespace Problem by Copying JavaScript Practice?</a></li>
+<li><a href="../misc/js_tutorial_and_emacs_lisp_vs_javascript.html">Emacs Lisp vs JavaScript</a></li>
+<li><a href="../emacs/elisp_common_lisp_in_emacs.html">Controversy of Common Lisp Package in Emacs Lisp</a></li>
+<li><a href="../emacs/lisp_list_problem.html">Lisp List Problem</a></li>
+<li><a href="../emacs/lisp1_vs_lisp2.html">Lisp-1 vs Lisp-2</a></li>
+<li><a href="../emacs/modernization_elisp_lib_problem.html">Emacs Lisp Problems: Trim String, Regex Match Data, Lacking Namespace</a></li>
+<li><a href="../emacs/thing-at-point_chaining_functions.html">Functional Programing: Function Output Should Always Have the Same Structure</a></li>
+</ul>
+</div>
+
+<div class="ads_bottom_dtpcz"></div>
+
+</main>
+
+
+<footer><a href="../index.html"><span class="xsignet">∑</span><span class="xsignetxah">XAH</span></a> <div class="cpr">© 2006, 2021 Xah Lee.</div></footer>
+
+<script defer src="../emacs/emacs_tooltip.js"></script>
+
+<script defer src="../highlightlink24082.js"></script>
+
+</body></html>
